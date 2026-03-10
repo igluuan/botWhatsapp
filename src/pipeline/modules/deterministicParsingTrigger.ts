@@ -6,19 +6,12 @@ import type {
 
 export const runDeterministicParsingTrigger = (
   authorization: AuthorizationResult,
-  mediaDetection: MediaDetectionResult,
+  _mediaDetection: MediaDetectionResult,
 ): DeterministicParsingTriggerResult => {
   if (!authorization.isAuthorized) {
     return {
       shouldTrigger: false,
       reason: "blocked-by-authorization",
-    };
-  }
-
-  if (mediaDetection.hasMedia) {
-    return {
-      shouldTrigger: false,
-      reason: "blocked-by-media",
     };
   }
 
