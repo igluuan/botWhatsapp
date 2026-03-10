@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+npm-debug.log
+dev.db
+prisma/dev.db
+.baileys_auth

@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  phoneNumber  String        @unique @map("phone_number")
+  transactions Transaction[]
+  messageLogs  MessageLog[]
+
+  @@map("users")
+}
+
+model Category {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  transactions Transaction[]
+
+  @@map("categories")
+}
+
+model Transaction {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  type            String
+  amount          Decimal
+  category        String
+  categoryId      String?   @map("category_id")
+  paymentMethod   String    @map("payment_method")
+  description     String?
+  transactionDate DateTime  @map("transaction_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryRef     Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+model MessageLog {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  direction   String
+  content     String
+  status      String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("message_logs")
+}

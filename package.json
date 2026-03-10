@@ -1,0 +1,37 @@
+{
+  "name": "bot-whatsapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WhatsApp Financial Companion Bot foundation",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@prisma/client": "^6.19.2",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "dotenv": "^16.6.1",
+    "fastify": "^5.6.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/hapi__boom": "^7.4.1",
+    "@types/node": "^24.3.0",
+    "@types/qrcode": "^1.5.6",
+    "prisma": "^6.19.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.18"
+  }
+}
