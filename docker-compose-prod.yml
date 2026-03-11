@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: file:/app/data/dev.db
+      WHATSAPP_AUTH_DIR: /app/.baileys_auth
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./.baileys_auth:/app/.baileys_auth
+      - ./data:/app/data
+    restart: always
