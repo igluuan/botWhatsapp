@@ -12,6 +12,7 @@ model User {
   phoneNumber  String        @unique @map("phone_number")
   transactions Transaction[]
   messageLogs  MessageLog[]
+  categoryRules UserCategoryRule[]
 
   @@map("users")
 }
@@ -56,4 +57,17 @@ model MessageLog {
 
   @@index([userId])
   @@map("message_logs")
+}
+
+model UserCategoryRule {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  keyword   String
+  category  String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyword])
+  @@index([userId])
+  @@map("user_category_rules")
 }

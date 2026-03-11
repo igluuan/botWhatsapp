@@ -1,3 +1,5 @@
+import { CANONICAL_LABELS } from "../categorization/categories.js";
+
 type PromptPayload = {
   system: string;
   user: string;
@@ -5,27 +7,19 @@ type PromptPayload = {
 
 const SYSTEM_PROMPT = [
   "Role: You are a financial assistant for WhatsApp.",
-  "Task: Interpret complex financial messages, extract transaction data, and classify categories.",
+  "Task: Interpret financial messages from a Brazilian couple and extract transaction data.",
   "Rules:",
   "- Never invent values",
-  "- Ask clarification if uncertain",
-  "- Return JSON only",
+  "- Return JSON only, no markdown",
+  '- If amount is missing, return {"invalid":true,"reason":"missing-amount"}',
+  "- Use ONLY the categories listed below — never create new ones",
+  `Valid categories: ${CANONICAL_LABELS.join(", ")}`,
   "Output format:",
-  '{"type":"expense|income","amount":number,"category":"string","payment_method":"string|null","description":"string"}',
+  '{"type":"expense|income","amount":number,"category":"one of the valid categories","payment_method":"pix|credit_card|debit_card|cash|null","description":"string"}',
 ].join("\n");
 
 export const buildAIInterpretationPrompt = (messageText: string): PromptPayload => {
-  const user = [
-    "Role: Financial transaction interpreter",
-    "Task: Parse the message and return structured transaction JSON.",
-    "Rules:",
-    "- Use only provided message content",
-    "- If amount is missing, return {\"invalid\":true,\"reason\":\"missing-amount\"}",
-    "- Keep category as a concise label",
-    "Output format:",
-    "JSON only",
-    `Message: ${messageText}`,
-  ].join("\n");
+  const user = `Message: ${messageText}`;
 
   return {
     system: SYSTEM_PROMPT,

@@ -1,4 +1,5 @@
 import type { DeterministicParserResult, ParsedFinancialMessage } from "./types.js";
+import { matchCategory } from "../categorization/categoryMatcher.js";
 
 const AMOUNT_PATTERN = "(\\d+(?:[.,]\\d{1,2})?)";
 const EXPENSE_VERB_CAPTURE = "(gastei|paguei|comprei|almocei|jantei|tomei)";
@@ -98,22 +99,7 @@ const detectPaymentMethod = (description: string): string | null => {
 };
 
 const detectCategory = (description: string, type: "expense" | "income"): string => {
-  const key = normalizeKey(description);
-
-  if (type === "income") {
-    if (key.includes("salario")) return "salário";
-    return "renda";
-  }
-
-  if (key.includes("almoco") || key.includes("jantar") || key.includes("lanche")) {
-    return "alimentação";
-  }
-  if (key.includes("uber") || key.includes("taxi") || key.includes("onibus")) return "transporte";
-  if (key.includes("pizza") || key.includes("cafe") || key.includes("restaurante")) {
-    return "alimentação";
-  }
-  if (key.includes("mercado") || key.includes("supermercado")) return "mercado";
-  return "geral";
+  return matchCategory(description, type);
 };
 
 const buildResult = (

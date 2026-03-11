@@ -22,7 +22,7 @@ describe("parseDeterministicFinancialMessage", () => {
     expect(result.matched).toBe(true);
     expect(result.data?.type).toBe("income");
     expect(result.data?.amount).toBe(5000);
-    expect(result.data?.category).toBe("salário");
+    expect(result.data?.category).toBe("renda");
   });
 
   it("parses expense with verb + description + amount + reais suffix", () => {
@@ -33,7 +33,7 @@ describe("parseDeterministicFinancialMessage", () => {
     expect(result.data).toEqual({
       type: "expense",
       amount: 7,
-      category: "geral",
+      category: "alimentação",
       payment_method: null,
       description: "pão",
     });

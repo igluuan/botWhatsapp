@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../database/prisma.js";
+import { saveUserCategoryRule } from "./categoryRuleService.js";
 
 type TransactionType = "expense" | "income";
 
@@ -281,6 +282,15 @@ export const editTransaction = async (
         id: category.id,
       },
     };
+
+    const descriptionForRule =
+      input.description !== undefined
+        ? normalizeDescription(input.description)
+        : existing.description;
+
+    if (descriptionForRule) {
+      await saveUserCategoryRule(input.userId, descriptionForRule, category.name);
+    }
   }
   if (input.paymentMethod !== undefined) {
     updateData.paymentMethod = normalizePaymentMethod(input.paymentMethod);
