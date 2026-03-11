@@ -12,42 +12,28 @@ import { extractTextContent } from "./modules/extractTextContent.js";
 import { normalizeMessage } from "./modules/messageNormalizer.js";
 import { detectIntent } from "./modules/intentDetector.js";
 import { shouldRespondGreeting } from "./modules/greetingCooldown.js";
-import { greetingResponse } from "./modules/greetingResponse.js";
-import { helpResponse } from "./modules/helpResponse.js";
 import { handleExpenseQuery } from "./modules/expenseQueryHandler.js";
 import { detectEditDeleteIntent } from "./modules/editDeleteDetector.js";
 import { handleEditDelete } from "./modules/editDeleteHandler.js";
 import { logIntent } from "./modules/intentLogger.js";
-import { unknownResponse } from "./modules/unknownResponse.js";
-
-const toCurrency = (value: number): string => {
-  return value.toFixed(2).replace(".", ",");
-};
-
-const buildRegisteredTransactionResponse = (input: {
-  description: string;
-  amount: number;
-  category: string;
-  paymentMethod: string | null;
-  transactionId: string;
-}): string => {
-  const lines = [
-    "✅ Registrado!",
-    `📝 ${input.description}`,
-    `💰 R$ ${toCurrency(input.amount)}`,
-    `🏷️ ${input.category}`,
-  ];
-  if (input.paymentMethod) {
-    lines.push(`💳 ${input.paymentMethod}`);
-  }
-  lines.push(`🆔 #${input.transactionId.slice(0, 8)}`);
-  return lines.join("\n");
-};
+import {
+  aiUnavailableResponse,
+  duplicateTransactionResponse,
+  greetingResponse,
+  helpResponse,
+  invalidAmountResponse,
+  notUnderstoodResponse,
+  registrationResponse,
+  smallTalkResponse,
+  unexpectedProcessingErrorResponse,
+  unexpectedRegistrationErrorResponse,
+  unknownResponse,
+} from "./modules/responses/index.js";
 
 const persistTransaction = async (
   remoteJid: string,
   data: ParsedFinancialMessage,
-): Promise<{ id: string }> => {
+): Promise<{ id: string; category: string; type: "expense" | "income"; amount: number; description: string | null }> => {
   const userId = await resolveOrCreateUserIdFromJid(remoteJid);
   const personalCategory = data.description
     ? await findUserCategoryRule(userId, data.description)
@@ -74,13 +60,13 @@ const handleTransactionPersistenceError = async (
   const errorMessage = error instanceof Error ? error.message : "unknown-error";
   if (errorMessage === "duplicate-transaction") {
     await socket.sendMessage(remoteJid, {
-      text: "⚠️ Essa transação parece duplicada. Já registrei algo igual agora há pouco.",
+      text: duplicateTransactionResponse(),
     });
     return;
   }
   if (errorMessage === "invalid-amount") {
     await socket.sendMessage(remoteJid, {
-      text: "⚠️ Valor inválido. Tente novamente com um número positivo.",
+      text: invalidAmountResponse(),
     });
     return;
   }
@@ -89,7 +75,7 @@ const handleTransactionPersistenceError = async (
     console.error("Unexpected user-not-found after resolveOrCreateUserIdFromJid");
   }
   await socket.sendMessage(remoteJid, {
-    text: "⚠️ Ocorreu um erro ao registrar sua transação. Tente novamente.",
+    text: unexpectedRegistrationErrorResponse(),
   });
 };
 
@@ -104,8 +90,11 @@ export const processIncomingMessage = async (
 
     if (intent === "greeting") {
       logIntent(message.remoteJid, intent);
-      if (shouldRespondGreeting(message.remoteJid)) {
-        await socket.sendMessage(message.remoteJid, { text: greetingResponse() });
+      const greetingCheck = shouldRespondGreeting(message.remoteJid);
+      if (greetingCheck.shouldRespond) {
+        await socket.sendMessage(message.remoteJid, {
+          text: greetingResponse(greetingCheck.isReturning),
+        });
       }
       return;
     }
@@ -118,7 +107,7 @@ export const processIncomingMessage = async (
 
     if (intent === "small_talk") {
       logIntent(message.remoteJid, intent);
-      await socket.sendMessage(message.remoteJid, { text: greetingResponse() });
+      await socket.sendMessage(message.remoteJid, { text: smallTalkResponse() });
       return;
     }
 
@@ -142,14 +131,14 @@ export const processIncomingMessage = async (
 
     if (result.aiFallback.reason === "ai-timeout") {
       await socket.sendMessage(message.remoteJid, {
-        text: "⚠️ A IA demorou demais. Tente novamente.",
+        text: aiUnavailableResponse(),
       });
       return;
     }
 
     if (result.aiFallback.reason === "ai-insufficient-credits") {
       await socket.sendMessage(message.remoteJid, {
-        text: '⚠️ Serviço de IA indisponível. Tente: "descrição valor" (ex: uber 20).',
+        text: aiUnavailableResponse(),
       });
       return;
     }
@@ -159,7 +148,7 @@ export const processIncomingMessage = async (
       result.aiFallback.reason === "ai-request-failed"
     ) {
       await socket.sendMessage(message.remoteJid, {
-        text: '⚠️ Não entendi. Tente: "descrição valor" (ex: mercado 120).',
+        text: notUnderstoodResponse(),
       });
       return;
     }
@@ -178,11 +167,11 @@ export const processIncomingMessage = async (
     try {
       const transaction = await persistTransaction(message.remoteJid, parsedData);
       await socket.sendMessage(message.remoteJid, {
-        text: buildRegisteredTransactionResponse({
-          description: parsedData.description,
-          amount: parsedData.amount,
-          category: parsedData.category,
-          paymentMethod: parsedData.payment_method,
+        text: registrationResponse({
+          type: transaction.type,
+          description: transaction.description ?? parsedData.description,
+          amount: transaction.amount,
+          category: transaction.category,
           transactionId: transaction.id,
         }),
       });
@@ -193,7 +182,7 @@ export const processIncomingMessage = async (
     console.error("processIncomingMessage fatal error:", error);
     try {
       await socket.sendMessage(message.remoteJid, {
-        text: "⚠️ Ocorreu um erro inesperado ao processar sua mensagem. Tente novamente.",
+        text: unexpectedProcessingErrorResponse(),
       });
     } catch (sendError) {
       console.error("Failed to send fallback error message:", sendError);

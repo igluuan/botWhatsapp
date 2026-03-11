@@ -5,6 +5,13 @@ import {
 import { resolveOrCreateUserIdFromJid } from "../../services/userService.js";
 import { prisma } from "../../database/prisma.js";
 import type { EditDeleteIntent } from "./editDeleteDetector.js";
+import {
+  deleteSuccessResponse,
+  editAmountSuccessResponse,
+  editCategorySuccessResponse,
+  transactionNotFoundResponse,
+  unexpectedProcessingErrorResponse,
+} from "./responses/index.js";
 
 const resolveFullTransactionId = async (
   userId: string,
@@ -24,19 +31,19 @@ export const handleEditDelete = async (
   remoteJid: string,
   intent: EditDeleteIntent,
 ): Promise<string> => {
-  if (!intent) return "⚠️ Comando não reconhecido.";
+  if (!intent) return "Hmm, não entendi direito 🤔\nTenta assim: *muda categoria #a1b2c3d4 pra transporte*";
 
   const userId = await resolveOrCreateUserIdFromJid(remoteJid);
   const fullId = await resolveFullTransactionId(userId, intent.transactionId);
 
   if (!fullId) {
-    return `⚠️ Lançamento #${intent.transactionId} não encontrado.`;
+    return transactionNotFoundResponse(intent.transactionId);
   }
 
   try {
     if (intent.action === "delete") {
       await deleteTransaction({ userId, transactionId: fullId });
-      return `🗑️ Lançamento #${intent.transactionId} removido.`;
+      return deleteSuccessResponse(intent.transactionId);
     }
 
     if (intent.action === "edit_category") {
@@ -45,26 +52,25 @@ export const handleEditDelete = async (
         transactionId: fullId,
         category: intent.newCategory,
       });
-      return `✅ Categoria do #${intent.transactionId} atualizada para *${intent.newCategory}*.`;
+      return editCategorySuccessResponse(intent.transactionId, intent.newCategory);
     }
 
     if (intent.action === "edit_amount") {
-      const formatted = intent.newAmount.toFixed(2).replace(".", ",");
       await editTransaction({
         userId,
         transactionId: fullId,
         amount: intent.newAmount,
       });
-      return `✅ Valor do #${intent.transactionId} atualizado para *R$ ${formatted}*.`;
+      return editAmountSuccessResponse(intent.transactionId, intent.newAmount);
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : "unknown";
     if (msg === "transaction-not-found") {
-      return `⚠️ Lançamento #${intent.transactionId} não encontrado.`;
+      return transactionNotFoundResponse(intent.transactionId);
     }
     console.error("editDeleteHandler error:", error);
-    return "⚠️ Erro ao editar lançamento. Tente novamente.";
+    return unexpectedProcessingErrorResponse();
   }
 
-  return "⚠️ Comando não reconhecido.";
+  return "Hmm, não entendi direito 🤔\nTenta assim: *muda categoria #a1b2c3d4 pra transporte*";
 };
