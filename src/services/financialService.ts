@@ -358,12 +358,27 @@ export const generateMonthlySummary = async (input: {
 
 export const generateCategorySummary = async (input: {
   userId: string;
+  periodStart?: Date;
+  periodEnd?: Date;
 }): Promise<{ items: CategorySummaryItem[] }> => {
   await assertUserOwnership(input.userId);
+  const where: {
+    userId: string;
+    transactionDate?: {
+      gte: Date;
+      lt: Date;
+    };
+  } = { userId: input.userId };
+  if (input.periodStart && input.periodEnd) {
+    where.transactionDate = {
+      gte: input.periodStart,
+      lt: input.periodEnd,
+    };
+  }
 
   const rows = await prisma.transaction.groupBy({
     by: ["category", "type"],
-    where: { userId: input.userId },
+    where,
     _sum: { amount: true },
     _count: { _all: true },
     orderBy: [{ category: "asc" }, { type: "asc" }],
