@@ -4,11 +4,10 @@ import type { AIClientResponse } from "./types.js";
 const AI_TIMEOUT_RETRY_DELAY_MS = 2000;
 const AI_TIMEOUT_MAX_RETRIES = 1;
 
-type ChatCompletionResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string | Array<{ type?: string; text?: string }>;
-    };
+type AnthropicResponse = {
+  content?: Array<{
+    type?: string;
+    text?: string;
   }>;
 };
 
@@ -22,20 +21,9 @@ export class AIRequestError extends Error {
   }
 }
 
-const extractContent = (response: ChatCompletionResponse): string | null => {
-  const messageContent = response.choices?.[0]?.message?.content;
-  if (typeof messageContent === "string") {
-    return messageContent.trim();
-  }
-
-  if (Array.isArray(messageContent)) {
-    const textChunk = messageContent.find((part) => part.type === "text" && part.text);
-    if (textChunk?.text) {
-      return textChunk.text.trim();
-    }
-  }
-
-  return null;
+const extractContent = (response: AnthropicResponse): string | null => {
+  const block = response.content?.find((b) => b.type === "text" && b.text);
+  return block?.text?.trim() ?? null;
 };
 
 const sleep = async (delayMs: number): Promise<void> => {
@@ -65,13 +53,15 @@ export const requestAIInterpretation = async (input: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${env.aiApiKey}`,
+          "x-api-key": env.aiApiKey,
+          "anthropic-version": env.aiAnthropicVersion,
         },
         body: JSON.stringify({
           model: env.aiModel,
+          max_tokens: 1024,
           temperature: 0,
+          system: input.systemPrompt,
           messages: [
-            { role: "system", content: input.systemPrompt },
             { role: "user", content: input.userPrompt },
           ],
         }),
@@ -84,7 +74,7 @@ export const requestAIInterpretation = async (input: {
         throw new AIRequestError(`ai-request-failed-${response.status}`, response.status);
       }
 
-      const payload = (await response.json()) as ChatCompletionResponse;
+      const payload = (await response.json()) as AnthropicResponse;
       const content = extractContent(payload);
       if (!content) {
         throw new AIRequestError("ai-empty-response");
