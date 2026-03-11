@@ -49,4 +49,5 @@ export type PipelineControllerResult = {
   deterministicParsing: DeterministicParserResult;
   intentRouting: IntentRoutingResult;
   aiFallback: AIInterpretationResult;
+  intent: string;
 };

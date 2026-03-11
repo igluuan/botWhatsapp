@@ -3,7 +3,6 @@ export const helpResponse = (): string => {
     "🤖 Como usar o bot:",
     "",
     "Registrar gasto:",
-    "",
     "• uber 20",
     "• almocei 35",
     "• mercado 120 no débito",
@@ -17,5 +16,13 @@ export const helpResponse = (): string => {
     "• gastos da semana",
     "• gastos do mês",
     "• extrato",
+    "",
+    "Editar lançamento:",
+    "• muda categoria #abc12345 pra transporte",
+    "• corrige valor #abc12345 pra 35",
+    "",
+    "Deletar lançamento:",
+    "• apaga #abc12345",
+    "• deleta #abc12345",
   ].join("\n");
 };

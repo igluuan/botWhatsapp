@@ -8,6 +8,7 @@ import { runMediaDetection } from "./modules/mediaDetection.js";
 import { runMediaProcessing } from "./modules/mediaProcessing.js";
 import { runMessageLogging } from "./modules/messageLogging.js";
 import { extractTextContent } from "./modules/extractTextContent.js";
+import { detectIntent } from "./modules/intentDetector.js";
 import { normalizeMessage } from "./modules/messageNormalizer.js";
 import { shouldUseAI } from "./modules/aiGuard.js";
 import type { PipelineControllerResult, PipelineIncomingMessage } from "./types.js";
@@ -15,11 +16,12 @@ import type { PipelineControllerResult, PipelineIncomingMessage } from "./types.
 export const runMessagePipeline = async (
   message: PipelineIncomingMessage,
 ): Promise<PipelineControllerResult> => {
+  const rawText = extractTextContent(message.rawPayload) ?? "";
+  const normalizedText = rawText ? normalizeMessage(rawText) : "";
+  const intent = normalizedText ? detectIntent(normalizedText) : "unknown";
   const authorization = runAuthorizationCheck(message, env.authorizedWhatsappJids);
-  console.log("DEBUG: Authorization result:", JSON.stringify(authorization, null, 2));
 
   if (!authorization.isAuthorized) {
-    console.log(`DEBUG: Unauthorized message from ${message.remoteJid}. Authorized JIDs: ${JSON.stringify(env.authorizedWhatsappJids)}`);
     return {
       authorization,
       messageLog: await runMessageLogging(message, false),
@@ -34,6 +36,7 @@ export const runMessagePipeline = async (
       deterministicParsing: { matched: false, reason: "unauthorized", data: null },
       intentRouting: { route: "unauthorized", reason: "unauthorized" },
       aiFallback: { matched: false, reason: "unauthorized", data: null },
+      intent,
     };
   }
 
@@ -64,7 +67,6 @@ export const runMessagePipeline = async (
     shouldRunAIFallback,
     mediaProcessing.extractedText,
   );
-  console.log("DEBUG: AI Fallback result:", JSON.stringify(aiFallback, null, 2));
 
   return {
     authorization,
@@ -75,5 +77,6 @@ export const runMessagePipeline = async (
     deterministicParsing,
     intentRouting,
     aiFallback,
+    intent,
   };
 };

@@ -84,16 +84,12 @@ export const initializeWhatsAppConnection = async (
     }
   });
   socket.ev.on("messages.upsert", async (event) => {
-    console.log("DEBUG: messages.upsert event received", JSON.stringify(event, null, 2));
     if (event.type !== "notify") {
-      console.log("DEBUG: event type is not notify, ignoring");
       return;
     }
 
     for (const message of event.messages) {
-      console.log("DEBUG: processing message", JSON.stringify(message, null, 2));
       if (!message.message || message.key.fromMe) {
-        console.log("DEBUG: message is empty or fromMe, ignoring");
         continue;
       }
 
@@ -103,11 +99,9 @@ export const initializeWhatsAppConnection = async (
       
       const remoteJid = effectiveJid;
       if (!remoteJid || remoteJid === "status@broadcast") {
-        console.log("DEBUG: remoteJid invalid or broadcast, ignoring");
         continue;
       }
 
-      console.log(`DEBUG: passing message from ${remoteJid} to pipeline (Original: ${message.key.remoteJid})`);
       await onMessage({
         messageId: message.key.id ?? "",
         remoteJid,

@@ -23,7 +23,6 @@ export const runAuthorizationCheck = (
   
   const isAuthorized = authorizedJids.some((jid) => {
     const normalizedAuthorized = normalizeJid(jid);
-    console.log(`Checking incoming ${normalizedRemoteJid} against authorized ${normalizedAuthorized}`);
     return normalizedAuthorized === normalizedRemoteJid;
   });
 
