@@ -1,14 +1,44 @@
 import type { DeterministicParserResult, ParsedFinancialMessage } from "./types.js";
 
 const AMOUNT_PATTERN = "(\\d+(?:[.,]\\d{1,2})?)";
-const EXPENSE_VERB_PREFIX = "(?:gastei|paguei|comprei|almocei|jantei|tomei)";
-const EXPENSE_VERB_PATTERN = new RegExp(`^${EXPENSE_VERB_PREFIX}\\s+${AMOUNT_PATTERN}\\s+(.+)$`, "iu");
-const EXPENSE_VERB_DESC_AMOUNT_PATTERN = new RegExp(
-  `^${EXPENSE_VERB_PREFIX}\\s+(.+?)\\s+${AMOUNT_PATTERN}$`,
+const EXPENSE_VERB_CAPTURE = "(gastei|paguei|comprei|almocei|jantei|tomei)";
+const EXPENSE_VERB_PATTERN = new RegExp(
+  `^${EXPENSE_VERB_CAPTURE}\\s+${AMOUNT_PATTERN}\\s+(.+)$`,
   "iu",
 );
+const EXPENSE_VERB_DESC_AMOUNT_PATTERN = new RegExp(
+  `^${EXPENSE_VERB_CAPTURE}\\s+(.+?)\\s+${AMOUNT_PATTERN}$`,
+  "iu",
+);
+const EXPENSE_VERB_AMOUNT_ONLY_PATTERN = new RegExp(`^${EXPENSE_VERB_CAPTURE}\\s+${AMOUNT_PATTERN}$`, "iu");
 const INCOME_VERB_PATTERN = new RegExp(`^recebi\\s+${AMOUNT_PATTERN}\\s+(.+)$`, "iu");
 const SIMPLE_PATTERN = new RegExp(`^(.+?)\\s+${AMOUNT_PATTERN}$`, "iu");
+const STOPWORD_TOKENS = new Set([
+  "hoje",
+  "ontem",
+  "agora",
+  "essa",
+  "semana",
+  "no",
+  "na",
+  "pelo",
+  "pela",
+  "por",
+  "num",
+  "numa",
+  "de",
+  "do",
+  "da",
+]);
+const PAYMENT_CONTEXT_TOKENS = new Set(["pix", "credito", "debito", "dinheiro", "cash", "cartao"]);
+const FOOD_VERB_INFERENCE: Record<string, { description: string; category: string } | null> = {
+  almocei: { description: "almoço", category: "alimentação" },
+  jantei: { description: "jantar", category: "alimentação" },
+  tomei: { description: "lanche", category: "alimentação" },
+  comprei: null,
+  gastei: null,
+  paguei: null,
+};
 
 const normalizeSpaces = (text: string): string => {
   return text.replace(/\s+/g, " ").trim();
@@ -25,6 +55,23 @@ const normalizeKey = (text: string): string => {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+};
+
+const isMeaningfulToken = (token: string): boolean => {
+  const normalizedToken = normalizeKey(token.replace(/[^\p{L}\p{N}]/gu, ""));
+  if (!normalizedToken) return false;
+  if (STOPWORD_TOKENS.has(normalizedToken)) return false;
+  if (PAYMENT_CONTEXT_TOKENS.has(normalizedToken)) return false;
+  return true;
+};
+
+const cleanDescription = (rawDescription: string): string | null => {
+  const normalized = normalizeSpaces(rawDescription).toLowerCase();
+  const withoutTemporalPhrase = normalized.replace(/\bessa semana\b/giu, " ");
+  const cleanedTokens = withoutTemporalPhrase.split(" ").filter(isMeaningfulToken);
+  const cleaned = normalizeSpaces(cleanedTokens.join(" "));
+  if (cleaned.length < 2) return null;
+  return cleaned;
 };
 
 const parseAmount = (rawAmount: string): number | null => {
@@ -58,6 +105,9 @@ const detectCategory = (description: string, type: "expense" | "income"): string
     return "renda";
   }
 
+  if (key.includes("almoco") || key.includes("jantar") || key.includes("lanche")) {
+    return "alimentação";
+  }
   if (key.includes("uber") || key.includes("taxi") || key.includes("onibus")) return "transporte";
   if (key.includes("pizza") || key.includes("cafe") || key.includes("restaurante")) {
     return "alimentação";
@@ -70,14 +120,30 @@ const buildResult = (
   type: "expense" | "income",
   rawAmount: string,
   rawDescription: string,
+  verb?: string,
 ): DeterministicParserResult => {
   const amount = parseAmount(rawAmount);
-  const description = normalizeSpaces(rawDescription).toLowerCase();
+  let description = cleanDescription(rawDescription);
 
-  if (!amount || !description) {
+  if (!amount) {
     return {
       matched: false,
       reason: "invalid-amount-or-description",
+      data: null,
+    };
+  }
+
+  if (!description && type === "expense" && verb) {
+    const inferred = FOOD_VERB_INFERENCE[normalizeKey(verb)] ?? null;
+    if (inferred) {
+      description = inferred.description;
+    }
+  }
+
+  if (!description) {
+    return {
+      matched: false,
+      reason: "no-meaningful-description",
       data: null,
     };
   }
@@ -117,14 +183,20 @@ export const parseDeterministicFinancialMessage = (
 
   const expenseVerbMatch = text.match(EXPENSE_VERB_PATTERN);
   if (expenseVerbMatch) {
-    const [, amount, description] = expenseVerbMatch;
-    return buildResult("expense", amount, description);
+    const [, verb, amount, description] = expenseVerbMatch;
+    return buildResult("expense", amount, description, verb);
   }
 
   const expenseVerbDescriptionAmountMatch = text.match(EXPENSE_VERB_DESC_AMOUNT_PATTERN);
   if (expenseVerbDescriptionAmountMatch) {
-    const [, description, amount] = expenseVerbDescriptionAmountMatch;
-    return buildResult("expense", amount, description);
+    const [, verb, description, amount] = expenseVerbDescriptionAmountMatch;
+    return buildResult("expense", amount, description, verb);
+  }
+
+  const expenseVerbAmountOnlyMatch = text.match(EXPENSE_VERB_AMOUNT_ONLY_PATTERN);
+  if (expenseVerbAmountOnlyMatch) {
+    const [, verb, amount] = expenseVerbAmountOnlyMatch;
+    return buildResult("expense", amount, "", verb);
   }
 
   const simpleMatch = text.match(SIMPLE_PATTERN);

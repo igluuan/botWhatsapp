@@ -11,8 +11,8 @@ describe("parseDeterministicFinancialMessage", () => {
       type: "expense",
       amount: 25.5,
       category: "alimentação",
-      payment_method: "pix",
-      description: "pizza no pix",
+      payment_method: null,
+      description: "pizza",
     });
   });
 
@@ -53,18 +53,89 @@ describe("parseDeterministicFinancialMessage", () => {
     });
   });
 
-  it.each(["comprei", "almocei", "jantei", "tomei"])(
-    "supports expense verb %s in description + amount format",
-    (verb) => {
-      const result = parseDeterministicFinancialMessage(`${verb} lanche 12`);
+  it("infers almoço for temporal-only description", () => {
+    const result = parseDeterministicFinancialMessage("almocei hoje 55");
 
-      expect(result.matched).toBe(true);
-      expect(result.reason).toBe("deterministic-match");
-      expect(result.data?.type).toBe("expense");
-      expect(result.data?.amount).toBe(12);
-      expect(result.data?.description).toBe("lanche");
-    },
-  );
+    expect(result).toEqual({
+      matched: true,
+      reason: "deterministic-match",
+      data: {
+        type: "expense",
+        amount: 55,
+        category: "alimentação",
+        payment_method: null,
+        description: "almoço",
+      },
+    });
+  });
+
+  it("infers jantar for temporal-only description", () => {
+    const result = parseDeterministicFinancialMessage("jantei ontem 40");
+
+    expect(result).toEqual({
+      matched: true,
+      reason: "deterministic-match",
+      data: {
+        type: "expense",
+        amount: 40,
+        category: "alimentação",
+        payment_method: null,
+        description: "jantar",
+      },
+    });
+  });
+
+  it("infers almoço when verb appears without explicit description", () => {
+    const result = parseDeterministicFinancialMessage("almocei 30");
+
+    expect(result).toEqual({
+      matched: true,
+      reason: "deterministic-match",
+      data: {
+        type: "expense",
+        amount: 30,
+        category: "alimentação",
+        payment_method: null,
+        description: "almoço",
+      },
+    });
+  });
+
+  it("rejects payment-context-only descriptions", () => {
+    const result = parseDeterministicFinancialMessage("paguei 22 no pix");
+
+    expect(result).toEqual({
+      matched: false,
+      reason: "no-meaningful-description",
+      data: null,
+    });
+  });
+
+  it("rejects temporal-only descriptions for non-inferable verbs", () => {
+    const result = parseDeterministicFinancialMessage("gastei 50 hoje");
+
+    expect(result).toEqual({
+      matched: false,
+      reason: "no-meaningful-description",
+      data: null,
+    });
+  });
+
+  it("parses simple amount format for transport", () => {
+    const result = parseDeterministicFinancialMessage("uber 20");
+
+    expect(result).toEqual({
+      matched: true,
+      reason: "deterministic-match",
+      data: {
+        type: "expense",
+        amount: 20,
+        category: "transporte",
+        payment_method: null,
+        description: "uber",
+      },
+    });
+  });
 
   it("rejects messages without supported pattern", () => {
     const result = parseDeterministicFinancialMessage("oi tudo bem");
